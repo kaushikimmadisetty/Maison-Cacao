@@ -171,12 +171,12 @@ export function buildRiver(scene) {
   normal.repeat.set(1, 1);
   const chocolate = new THREE.MeshPhysicalMaterial({
     color: 0x3d1c0b,
-    roughness: 0.2,
+    roughness: 0.3,
     clearcoat: 1,
-    clearcoatRoughness: 0.05,
+    clearcoatRoughness: 0.16, // satin: highlights spread into a sheen, not a hot point
     normalMap: normal,
     normalScale: new THREE.Vector2(0.55, 0.55),
-    envMapIntensity: 1.1,
+    envMapIntensity: 0.9,
   });
 
   const river = new THREE.Mesh(ribbonGeometry(riverCurve, WIDTH, 800, 5), chocolate);

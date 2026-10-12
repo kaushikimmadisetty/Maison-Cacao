@@ -173,7 +173,7 @@ export function warmEnvironmentScene() {
   geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
   s.add(new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide })));
 
-  const win = new THREE.MeshBasicMaterial({ color: new THREE.Color(1, 0.7, 0.4).multiplyScalar(5) });
+  const win = new THREE.MeshBasicMaterial({ color: new THREE.Color(1, 0.64, 0.32).multiplyScalar(2.2) }) // match the amber glass;
   for (let a = 0; a < 8; a++) {
     const ang = (a / 8) * Math.PI * 2 + 0.2;
     const m = new THREE.Mesh(new THREE.PlaneGeometry(6, 14), win);

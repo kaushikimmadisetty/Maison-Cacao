@@ -66,9 +66,9 @@ controls.autoRotateSpeed = 0.25;
 controls.enabled = false;
 
 // ---------- lighting ----------
-scene.add(new THREE.HemisphereLight(0xffc88a, 0x1a0905, 0.18));
+scene.add(new THREE.HemisphereLight(0xffc88a, 0x1a0905, 0.26));
 
-const sun = new THREE.DirectionalLight(0xffb560, 2.6);
+const sun = new THREE.DirectionalLight(0xffa24a, 1.7);
 sun.position.set(-28, 26, -22);
 sun.castShadow = true;
 sun.shadow.mapSize.set(2048, 2048);
