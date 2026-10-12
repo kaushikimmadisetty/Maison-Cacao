@@ -12,15 +12,10 @@ import { createDive } from './dive.js';
 
 import { MARBLES } from './textures.js';
 
-const timings = {};
-let lastMark = performance.now();
 const loaderFill = document.getElementById('loader-fill');
 // Yield to the browser between heavy steps so the loader keeps animating
 const tick = () => new Promise((r) => requestAnimationFrame(() => setTimeout(r, 0)));
-async function setProgress(p, label) {
-  const now = performance.now();
-  if (label) timings[label] = Math.round(now - lastMark);
-  lastMark = now;
+async function setProgress(p) {
   loaderFill.style.transform = `scaleX(${p})`;
   window.dispatchEvent(new CustomEvent('loadprogress', { detail: p }));
   await tick();
@@ -91,14 +86,14 @@ scene.add(fill);
 let p = 0.08;
 for (const k of Object.keys(MARBLES)) {
   MARBLES[k]();
-  await setProgress((p += 0.09), `marble:${k}`);
+  await setProgress((p += 0.09));
 }
 const hall = buildHall(scene, { floorMask: riverFloorMask() });
-await setProgress(0.55, 'hall');
+await setProgress(0.55);
 const river = buildRiver(scene);
-await setProgress(0.66, 'river');
+await setProgress(0.66);
 const underworld = buildUnderworld(envTexture);
-await setProgress(0.74, 'underworld');
+await setProgress(0.74);
 
 // ---------- post ----------
 const composer = new EffectComposer(renderer);
@@ -158,22 +153,16 @@ function frame() {
   requestAnimationFrame(frame);
 }
 
-window.__debug = {
-  camera, controls, dive, timings,
-  render: () => { controls.update(); composer.render(); },
-  skipIntro: () => { introStart = clock.elapsedTime - INTRO; },
-};
 
 // Compile every shader for both worlds up front (non-blocking where supported),
 // so neither the reveal nor the first dive hitches.
-await setProgress(0.8, 'setup');
+await setProgress(0.8);
 await renderer.compileAsync(scene, camera);
-await setProgress(0.9, 'compile:hall');
+await setProgress(0.9);
 await renderer.compileAsync(underworld.scene, camera);
-await setProgress(0.96, 'compile:underworld');
+await setProgress(0.96);
 composer.render();
-await setProgress(1, 'first-frame');
-console.info('[load ms]', timings);
+await setProgress(1);
 
 frame();
 await revealLoader();
