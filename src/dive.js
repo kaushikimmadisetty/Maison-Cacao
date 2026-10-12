@@ -69,7 +69,7 @@ const smooth = (x) => x * x * (3 - 2 * x);
 const easeOut = (x) => 1 - Math.pow(1 - x, 3);
 const clamp01 = (x) => Math.min(1, Math.max(0, x));
 
-export function createDive({ camera, controls, canvas, renderPass, surfaceScene, underworld, river, canInteract }) {
+export function createDive({ camera, controls, canvas, renderPass, surfaceScene, underworld, river, canInteract, fitFov = (f) => f }) {
   const pass = new ShaderPass(VortexShader);
   pass.enabled = false;
   const U = pass.uniforms;
@@ -101,9 +101,23 @@ export function createDive({ camera, controls, canvas, renderPass, surfaceScene,
     return raycaster.intersectObjects(river.meshes, false)[0];
   }
 
+  // Long-press is our gesture: suppress the browser's context menu / callout
+  canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+
+  const activePointers = new Set();
+  canvas.addEventListener('pointerdown', (e) => activePointers.add(e.pointerId));
+  const forget = (e) => activePointers.delete(e.pointerId);
+  window.addEventListener('pointerup', forget);
+  window.addEventListener('pointercancel', forget);
+
   // Capture phase so we can disable OrbitControls before it sees the press
   canvas.addEventListener('pointerdown', (e) => {
     if (mode !== 'surface' || !canInteract()) return;
+    // A second finger means pinch / pan: abandon any dive in progress
+    if (activePointers.size > 0) {
+      holding = false;
+      return;
+    }
     const hit = hitRiver(e);
     if (!hit) return;
     controls.enabled = false;
@@ -126,6 +140,7 @@ export function createDive({ camera, controls, canvas, renderPass, surfaceScene,
   window.addEventListener('pointercancel', release);
 
   canvas.addEventListener('pointermove', (e) => {
+    if (e.pointerType !== 'mouse') return; // no hover on touch screens
     if (mode !== 'surface' || holding || hold > 0 || !canInteract()) return;
     canvas.style.cursor = hitRiver(e) ? 'pointer' : '';
   });
@@ -235,7 +250,7 @@ export function createDive({ camera, controls, canvas, renderPass, surfaceScene,
         const e = easeOut(q);
         camera.position.lerpVectors(tmp.set(0, 17, 5), UNDER_CAM, e);
         look.lerpVectors(tmp.set(0, -2, 0), UNDER_TARGET, smooth(q));
-        aim(105 + (50 - 105) * e);
+        aim(105 + (fitFov(50) - 105) * e);
         post({ blur: 1 - e, swirl: 3 * (1 - e), vignette: 0.9 * (1 - e) + 0.25, aberr: 0.03 * (1 - e), fade: 1 - smooth(clamp01(q / 0.5)), center: new THREE.Vector2(0.5, 0.5) });
         if (q >= 1) {
           mode = 'under';

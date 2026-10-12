@@ -518,7 +518,7 @@ function flame(seed, w, h) {
   return m;
 }
 
-function brazier() {
+function brazier(withLight = true) {
   const g = new THREE.Group();
   const bowl = new THREE.Mesh(new THREE.LatheGeometry([
     [0, 0], [0.3, 0.02], [0.75, 0.25], [0.95, 0.55], [1.0, 0.62], [0.92, 0.62], [0.85, 0.5], [0, 0.4],
@@ -552,19 +552,22 @@ function brazier() {
     f.position.set(dx, 2.62, dz);
     g.add(f);
   }
-  const light = new THREE.PointLight(0xff8a3a, 12, 14, 2);
-  light.position.y = 3.4;
-  g.add(light);
+  // Each point light adds cost to every lit pixel; phones go without
+  const light = withLight ? new THREE.PointLight(0xff8a3a, 12, 14, 2) : null;
+  if (light) {
+    light.position.y = 3.4;
+    g.add(light);
+  }
   return {
     group: g,
     update(t) {
-      light.intensity = 12 + 2.5 * Math.sin(t * 11) + 1.5 * Math.sin(t * 23);
+      if (light) light.intensity = 12 + 2.5 * Math.sin(t * 11) + 1.5 * Math.sin(t * 23);
     },
   };
 }
 
 // ---------- assemble ----------
-export function buildHall(scene, { floorMask } = {}) {
+export function buildHall(scene, { floorMask, lite = false } = {}) {
   scene.add(floor(floorMask));
   scene.add(walls());
   scene.add(vault());
@@ -600,8 +603,8 @@ export function buildHall(scene, { floorMask } = {}) {
 
   // Lights hidden on the cornice, washing up into the vault
   for (const x of [-22, 22])
-    for (const z of [-12, 10]) {
-      const l = new THREE.PointLight(0xffb468, 90, 34, 2);
+    for (const z of lite ? [-1] : [-12, 10]) {
+      const l = new THREE.PointLight(0xffb468, lite ? 150 : 90, lite ? 44 : 34, 2);
       l.position.set(x, HALL.h + 1, z);
       scene.add(l);
     }
@@ -620,7 +623,7 @@ export function buildHall(scene, { floorMask } = {}) {
 
   // Braziers along the river
   const braziers = [[5.5, -13], [-12, -4], [2.5, -4.5], [-2.5, 10], [12, 15.5], [-9, 17]].map(([x, z]) => {
-    const b = brazier();
+    const b = brazier(!lite);
     b.group.position.set(x, 0, z);
     scene.add(b.group);
     return b;
