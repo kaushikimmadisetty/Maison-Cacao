@@ -48,24 +48,27 @@ scene.environment = envTexture;
 
 // ---------- camera ----------
 const camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.1, 200);
-const CAM_START = new THREE.Vector3(26, 15, 30);
-const CAM_END = new THREE.Vector3(15, 5.5, 19);
+const CAM_START = new THREE.Vector3(21, 14, 21.5);
+const CAM_END = new THREE.Vector3(12, 5, 16);
 camera.position.copy(CAM_START);
 
+const HALL_MIN = new THREE.Vector3(-27.5, 0.8, -22.5);
+const HALL_MAX = new THREE.Vector3(27.5, 16, 22.5);
+
 const controls = new OrbitControls(camera, canvas);
-controls.target.set(-1, 5.5, -5);
+controls.target.set(0, 5.5, -2); // hall centre, so the orbit stays inside the room
 controls.enableDamping = true;
 controls.dampingFactor = 0.05;
 controls.minDistance = 6;
-controls.maxDistance = 34;
+controls.maxDistance = 22;
 controls.maxPolarAngle = Math.PI * 0.49;
 controls.autoRotateSpeed = 0.25;
 controls.enabled = false;
 
 // ---------- lighting ----------
-scene.add(new THREE.HemisphereLight(0xffc88a, 0x1a0905, 0.18));
+scene.add(new THREE.HemisphereLight(0xffc88a, 0x1a0905, 0.26));
 
-const sun = new THREE.DirectionalLight(0xffb560, 2.6);
+const sun = new THREE.DirectionalLight(0xffa24a, 1.7);
 sun.position.set(-28, 26, -22);
 sun.castShadow = true;
 sun.shadow.mapSize.set(2048, 2048);
@@ -101,7 +104,7 @@ await setProgress(0.74, 'underworld');
 const composer = new EffectComposer(renderer);
 const renderPass = new RenderPass(scene, camera);
 composer.addPass(renderPass);
-const bloom = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.45, 0.6, 0.92);
+const bloom = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.38, 0.55, 0.92);
 composer.addPass(bloom);
 // declared below the loop vars; created here so its pass sits before tone mapping
 let introDone = false;
@@ -141,7 +144,11 @@ function frame() {
     }
   }
   const diveOwnsCamera = dive.update(dt, t);
-  if (!diveOwnsCamera) controls.update();
+  if (!diveOwnsCamera) {
+    controls.update();
+    // Never let the camera leave the hall (walls are only drawn from inside)
+    if (!dive.underActive) camera.position.clamp(HALL_MIN, HALL_MAX);
+  }
   if (dive.underActive) underworld.update(dt, t);
   else {
     river.update(dt, t);

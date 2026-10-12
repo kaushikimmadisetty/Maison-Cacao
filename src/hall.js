@@ -18,7 +18,39 @@ const ivory = new THREE.MeshStandardMaterial({ color: 0xeadfc8, roughness: 0.32,
 const gold = new THREE.MeshStandardMaterial({ color: 0xe0ab52, metalness: 1, roughness: 0.22, envMapIntensity: 1.2 });
 const goldSoft = new THREE.MeshStandardMaterial({ color: 0xc9944a, metalness: 1, roughness: 0.38 });
 const cofferPaint = new THREE.MeshStandardMaterial({ color: 0x2b1409, roughness: 0.75, envMapIntensity: 0.3, side: THREE.DoubleSide });
-const windowGlow = new THREE.MeshBasicMaterial({ color: new THREE.Color(1.0, 0.72, 0.42).multiplyScalar(1.9), fog: false });
+// Amber glass: bright at the top, deepening to honey at the sill, faintly mottled.
+// Only the top of each pane crosses the bloom threshold, so windows glow without glaring.
+let glassCanvas = null;
+function glassMaterial(w, h, xMin = -w / 2) {
+  if (!glassCanvas) {
+    const W = 128, H = 512;
+    glassCanvas = document.createElement('canvas');
+    glassCanvas.width = W; glassCanvas.height = H;
+    const ctx = glassCanvas.getContext('2d');
+    const grad = ctx.createLinearGradient(0, 0, 0, H);
+    grad.addColorStop(0, 'rgb(255, 232, 186)');
+    grad.addColorStop(0.35, 'rgb(240, 190, 120)');
+    grad.addColorStop(1, 'rgb(214, 146, 78)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, W, H);
+    // hand-blown glass mottling
+    for (let i = 0; i < 260; i++) {
+      const x = Math.random() * W, y = Math.random() * H, r = 4 + Math.random() * 14;
+      const g2 = ctx.createRadialGradient(x, y, 0, x, y, r);
+      const dark = Math.random() < 0.5;
+      g2.addColorStop(0, dark ? 'rgba(120,60,20,0.045)' : 'rgba(255,240,210,0.06)');
+      g2.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = g2;
+      ctx.fillRect(x - r, y - r, r * 2, r * 2);
+    }
+  }
+  const tex = new THREE.CanvasTexture(glassCanvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  // ShapeGeometry UVs are in metres; map the shape's bounds onto the texture
+  tex.repeat.set(1 / w, 1 / h);
+  tex.offset.set(-xMin / w, 0);
+  return new THREE.MeshBasicMaterial({ map: tex, color: new THREE.Color(1.45, 1.4, 1.32) });
+}
 const coveGlow = new THREE.MeshBasicMaterial({ color: new THREE.Color(1.0, 0.7, 0.38).multiplyScalar(2.2) });
 
 function shadows(obj, cast = true, receive = true) {
@@ -63,19 +95,28 @@ function archShape(w, h) {
   return s;
 }
 
-function archRing(w, h, grow, depth, mat) {
-  const outer = archShape(w + grow, h + grow / 2);
-  outer.holes.push(new THREE.Path(archShape(w, h).getPoints(32)));
-  const ring = new THREE.Mesh(new THREE.ExtrudeGeometry(outer, { depth, bevelEnabled: false, curveSegments: 32 }), mat);
-  ring.position.set(0, -grow / 4, -0.05);
+// A moulded ring around an arch opening. Each ring gets its own distinct inner
+// edge (`inset`), so nested rings never share a surface (which z-fights).
+function archRing(w, h, inset, grow, depth, mat) {
+  const iw = w + inset * 2, ih = h + inset;
+  const outer = archShape(iw + grow * 2, ih + grow);
+  outer.holes.push(new THREE.Path(archShape(iw, ih).getPoints(48).reverse()));
+  const ring = new THREE.Mesh(new THREE.ExtrudeGeometry(outer, { depth, bevelEnabled: false, curveSegments: 48 }), mat);
+  ring.position.z = -0.05;
   return ring;
 }
 
 function archWindow(w, h) {
   const g = new THREE.Group();
-  g.add(new THREE.Mesh(new THREE.ShapeGeometry(archShape(w, h), 32), windowGlow));
-  // Stepped ivory surround with a gilded inner bead
-  g.add(archRing(w, h, 1.1, 0.35, ivory), archRing(w, h, 0.55, 0.5, ivory), archRing(w, h, 0.16, 0.56, gold));
+  g.add(new THREE.Mesh(new THREE.ShapeGeometry(archShape(w, h), 32), glassMaterial(w, h)));
+  // Stepped surround, stepping back from a gilded bead at the glass
+  const surround = new THREE.Group();
+  surround.add(
+    archRing(w, h, 0, 0.09, 0.62, gold),        // bead hugging the glass
+    archRing(w, h, 0.09, 0.42, 0.5, ivory),     // inner fascia
+    archRing(w, h, 0.51, 0.5, 0.34, ivory),     // outer fascia, set back
+  );
+  g.add(surround);
 
   // Keystone
   const ks = new THREE.Shape();
@@ -90,6 +131,7 @@ function archWindow(w, h) {
   for (let y = h / 5; y < h - w / 2; y += h / 5) bar(w, 0.08, 0, y);
   // Sill
   g.add(box(w + 1.4, 0.25, 0.8, ivory, 0, -0.12, 0.2));
+  g.userData.noShadow = true;
   return g;
 }
 
@@ -99,7 +141,7 @@ function thermalWindow(r) {
   const half = new THREE.Shape();
   half.absarc(0, 0, r, 0, Math.PI, false);
   half.lineTo(r, 0);
-  g.add(new THREE.Mesh(new THREE.ShapeGeometry(half, 64), windowGlow));
+  g.add(new THREE.Mesh(new THREE.ShapeGeometry(half, 64), glassMaterial(2 * r, r)));
   const frame = new THREE.Shape();
   frame.absarc(0, 0, r + 1.1, 0, Math.PI, false);
   frame.lineTo(-r, 0);
@@ -195,6 +237,8 @@ function walls() {
   g.add(box(0.35, 0.5, d, ivory, w / 2 - 0.17, 0.25, 0));
 
   shadows(g, false, true); // walls let the sun through the windows
+  // window frames: thin reveals at grazing sun angles cause shadow acne
+  g.traverse((o) => { if (o.userData.noShadow) shadows(o, false, false); });
   return g;
 }
 
