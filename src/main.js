@@ -23,15 +23,23 @@ async function setProgress(p) {
 await tick();
 await setProgress(0.04);
 
+// ---------- quality ----------
+// Phones get a lighter profile up front; every device then adapts its
+// resolution to the frame rate it actually achieves.
+const MOBILE = matchMedia('(pointer: coarse)').matches || Math.min(innerWidth, innerHeight) < 600;
+const DPR_MAX = Math.min(window.devicePixelRatio, MOBILE ? 1.5 : 2);
+const DPR_MIN = MOBILE ? 0.75 : 1;
+let dpr = DPR_MAX;
+
 // ---------- renderer ----------
 const canvas = document.getElementById('scene');
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: !MOBILE, powerPreference: 'high-performance' });
+renderer.setPixelRatio(dpr);
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 0.78;
 renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.shadowMap.type = MOBILE ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x1a0c06);
@@ -43,6 +51,14 @@ scene.environment = envTexture;
 
 // ---------- camera ----------
 const camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.1, 200);
+/** Vertical FOV for a desired one, widened on portrait screens so at least `minH`° fits horizontally. */
+function fitFov(vfov, minH = 52) {
+  const aspect = window.innerWidth / window.innerHeight;
+  const needed = 2 * THREE.MathUtils.radToDeg(Math.atan(Math.tan(THREE.MathUtils.degToRad(minH / 2)) / aspect));
+  return Math.min(Math.max(vfov, needed), 78);
+}
+camera.fov = fitFov(42);
+camera.updateProjectionMatrix();
 const CAM_START = new THREE.Vector3(21, 14, 21.5);
 const CAM_END = new THREE.Vector3(12, 5, 16);
 camera.position.copy(CAM_START);
@@ -61,12 +77,13 @@ controls.autoRotateSpeed = 0.25;
 controls.enabled = false;
 
 // ---------- lighting ----------
-scene.add(new THREE.HemisphereLight(0xffc88a, 0x1a0905, 0.26));
+// Phones drop the per-brazier point lights, so lift the ambient a touch to compensate
+scene.add(new THREE.HemisphereLight(0xffc88a, 0x1a0905, MOBILE ? 0.34 : 0.26));
 
 const sun = new THREE.DirectionalLight(0xffa24a, 1.7);
 sun.position.set(-28, 26, -22);
 sun.castShadow = true;
-sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.mapSize.setScalar(MOBILE ? 1024 : 2048);
 sun.shadow.camera.left = -36;
 sun.shadow.camera.right = 36;
 sun.shadow.camera.top = 36;
@@ -88,7 +105,7 @@ for (const k of Object.keys(MARBLES)) {
   MARBLES[k]();
   await setProgress((p += 0.09));
 }
-const hall = buildHall(scene, { floorMask: riverFloorMask() });
+const hall = buildHall(scene, { floorMask: riverFloorMask(), lite: MOBILE });
 await setProgress(0.55);
 const river = buildRiver(scene);
 await setProgress(0.66);
@@ -99,23 +116,50 @@ await setProgress(0.74);
 const composer = new EffectComposer(renderer);
 const renderPass = new RenderPass(scene, camera);
 composer.addPass(renderPass);
-const bloom = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.38, 0.55, 0.92);
+const bloomRes = MOBILE ? 0.5 : 1;
+const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth * bloomRes, innerHeight * bloomRes), 0.38, 0.55, 0.92);
 composer.addPass(bloom);
 // declared below the loop vars; created here so its pass sits before tone mapping
 let introDone = false;
 const dive = createDive({
   camera, controls, canvas, renderPass, surfaceScene: scene, underworld, river,
   canInteract: () => introDone,
+  fitFov,
 });
 composer.addPass(dive.pass);
 composer.addPass(new OutputPass());
 
-window.addEventListener('resize', () => {
-  camera.aspect = window.innerWidth / window.innerHeight;
+function applySize() {
+  camera.aspect = innerWidth / innerHeight;
+  if (dive.mode === 'surface' || dive.mode === 'under') camera.fov = fitFov(dive.mode === 'under' ? 50 : 42);
   camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  composer.setSize(window.innerWidth, window.innerHeight);
-});
+  renderer.setPixelRatio(dpr);
+  composer.setPixelRatio(dpr);
+  renderer.setSize(innerWidth, innerHeight);
+  composer.setSize(innerWidth, innerHeight);
+}
+window.addEventListener('resize', applySize);
+
+// Adaptive resolution: watch the real frame time and step the pixel ratio
+// down when we're struggling, back up when there's headroom.
+const perf = { frames: 0, time: 0, cooldown: 2 };
+function adaptQuality(dt) {
+  perf.frames++;
+  perf.time += dt;
+  if (perf.time < 1) return;
+  const fps = perf.frames / perf.time;
+  perf.frames = 0;
+  perf.time = 0;
+  if (perf.cooldown-- > 0) return;
+  let next = dpr;
+  if (fps < 42 && dpr > DPR_MIN) next = Math.max(DPR_MIN, dpr - 0.25);
+  else if (fps > 57 && dpr < DPR_MAX) next = Math.min(DPR_MAX, dpr + 0.25);
+  if (next !== dpr) {
+    dpr = next;
+    applySize();
+    perf.cooldown = 2;
+  }
+}
 
 // ---------- loop ----------
 const clock = new THREE.Clock();
@@ -125,8 +169,10 @@ const ease = (x) => 1 - Math.pow(1 - x, 3);
 let introStart = null; // set when the loader opens
 
 function frame() {
-  const dt = Math.min(clock.getDelta(), 0.05);
+  const rawDt = clock.getDelta();
+  const dt = Math.min(rawDt, 0.05);
   const t = clock.elapsedTime;
+  if (introDone && !document.hidden) adaptQuality(rawDt);
 
   if (!introDone) {
     const k = introStart === null ? 0 : ease(Math.min((t - introStart) / INTRO, 1));

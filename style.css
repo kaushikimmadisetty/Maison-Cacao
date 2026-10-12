@@ -13,6 +13,11 @@ html, body {
   width: 100%;
   height: 100%;
   overflow: hidden;
+  overscroll-behavior: none;         /* no pull-to-refresh / bounce */
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;       /* long-press on the river must not open the iOS callout */
+  -webkit-user-select: none;
+  user-select: none;
   background: var(--cocoa);
   color: var(--cream);
   font-family: var(--serif);
@@ -346,6 +351,33 @@ body.under .hero-under .surface-btn { pointer-events: auto; }
 
 
 @media (max-width: 720px) {
-  .nav { padding: 20px 16px; }
-  .hero { left: 16px; right: 16px; bottom: 40px; }
+  .nav {
+    padding: max(18px, env(safe-area-inset-top)) max(18px, env(safe-area-inset-right)) 18px max(18px, env(safe-area-inset-left));
+  }
+  .brand { gap: 12px; }
+  .brand-crest { width: 38px; height: 38px; }
+  .brand-rule { height: 32px; }
+  .brand-maison { font-size: 9px; letter-spacing: 0.55em; margin-bottom: 4px; }
+  .brand-cacao { font-size: 28px; }
+
+  .hero {
+    left: max(20px, env(safe-area-inset-left));
+    right: max(20px, env(safe-area-inset-right));
+    bottom: max(36px, calc(env(safe-area-inset-bottom) + 20px));
+  }
+  .eyebrow { font-size: 10px; letter-spacing: 0.3em; line-height: 1.7; margin-bottom: 14px; }
+  .hero h1 { font-size: clamp(40px, 12vw, 56px); line-height: 1; }
+  .sub { font-size: 17px; margin-top: 16px; }
+  .surface-btn { margin-top: 22px; padding: 14px 24px; }
+
+  /* deeper scrim so type holds up over the scene on a small screen */
+  body::before {
+    background:
+      linear-gradient(180deg, rgba(12, 6, 3, 0.7) 0%, rgba(12, 6, 3, 0) 120px),
+      linear-gradient(0deg, rgba(12, 6, 3, 0.78) 0%, rgba(12, 6, 3, 0.4) 28%, rgba(12, 6, 3, 0) 50%);
+  }
+
+  .loader-est { font-size: 10px; letter-spacing: 0.3em; gap: 10px; }
+  .loader-est i { width: 24px; }
+  .loader-progress { width: 180px; }
 }
