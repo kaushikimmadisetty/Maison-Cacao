@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Maison Cacao</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body class="loading">
+  <canvas id="scene"></canvas>
+
+  <div class="loader" id="loader" aria-label="Loading">
+    <div class="curtain top"></div>
+    <div class="curtain bottom"></div>
+    <div class="loader-glow"></div>
+    <div class="loader-grain"></div>
+    <div class="loader-seam"></div>
+
+    <div class="loader-content">
+     <div class="loader-inner">
+      <div class="crest">
+        <svg viewBox="0 0 120 120" class="crest-ring" aria-hidden="true">
+          <circle cx="60" cy="60" r="57" />
+          <circle cx="60" cy="60" r="53" class="dots" />
+        </svg>
+        <svg viewBox="0 0 120 120" class="crest-body" aria-hidden="true">
+          <defs>
+            <linearGradient id="goldGrad" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stop-color="#f7dc9c" />
+              <stop offset="0.45" stop-color="#d9a24b" />
+              <stop offset="1" stop-color="#8a5a22" />
+            </linearGradient>
+          </defs>
+          <g id="laurel" fill="url(#goldGrad)"></g>
+          <path d="M44 84 V58 A16 16 0 0 1 76 58 V84" fill="none" stroke="url(#goldGrad)" stroke-width="1.6" />
+          <path d="M48 84 V59 A12 12 0 0 1 72 59 V84" fill="none" stroke="url(#goldGrad)" stroke-width="0.7" />
+          <path d="M57.5 42.5 h5 l1 4.5 h-7 z" fill="url(#goldGrad)" />
+          <path d="M40 84 h40" stroke="url(#goldGrad)" stroke-width="1.4" />
+          <path d="M60 62 c-4 6 -5 9 -5 11 a5 5 0 0 0 10 0 c0 -2 -1 -5 -5 -11z" fill="url(#goldGrad)" />
+        </svg>
+      </div>
+      <p class="loader-eyebrow">Maison</p>
+      <h2 class="loader-title"><span>Cacao</span></h2>
+      <p class="loader-est"><i></i>Roma · MDCCCXCI<i></i></p>
+      <div class="loader-progress"><span id="loader-fill"></span></div>
+      <p class="loader-count"><span id="loader-count">000</span></p>
+     </div>
+    </div>
+  </div>
+  <script>
+    // Laurel wreath: two branches of leaves sweeping up either side of the crest
+    (function () {
+      const g = document.getElementById('laurel');
+      let s = '';
+      // θ = 0 at the bottom of the circle, sweeping up each side; leaves follow
+      // the tangent, alternating inner/outer rows and tilting outward.
+      for (const side of [-1, 1]) {
+        for (let i = 0; i < 13; i++) {
+          const th = (16 + i * 10.5) * Math.PI / 180;
+          const outer = i % 2 === 0;
+          const r = 44 + (outer ? 2.6 : -2.6);
+          const x = 60 + side * r * Math.sin(th);
+          const y = 60 + r * Math.cos(th);
+          const tangent = side * -th * 180 / Math.PI;           // direction of travel along the branch
+          const rot = tangent + 90 * side + side * (outer ? -32 : 32) * -1;
+          const k = 1 - i * 0.03;
+          s += `<ellipse cx="${x.toFixed(2)}" cy="${y.toFixed(2)}" rx="${(2.1 * k).toFixed(2)}" ry="${(5.4 * k).toFixed(2)}" transform="rotate(${rot.toFixed(1)} ${x.toFixed(2)} ${y.toFixed(2)})" />`;
+        }
+        // the branch stem
+        const pts = [];
+        for (let i = 0; i <= 20; i++) {
+          const th = (12 + i * 6.9) * Math.PI / 180;
+          pts.push(`${(60 + side * 44 * Math.sin(th)).toFixed(2)},${(60 + 44 * Math.cos(th)).toFixed(2)}`);
+        }
+        s += `<polyline points="${pts.join(' ')}" fill="none" stroke="url(#goldGrad)" stroke-width="0.8" />`;
+      }
+      g.innerHTML = s;
+      window.addEventListener('loadprogress', (e) => {
+        document.getElementById('loader-count').textContent = String(Math.round(e.detail * 100)).padStart(3, '0');
+      });
+    })();
+  </script>
+
+  <header class="nav">
+    <div class="brand">Maison <em>Cacao</em></div>
+    <nav>
+      <a href="#">The Floor</a>
+      <a href="#">Our Beans</a>
+      <a href="#">Atelier</a>
+      <a href="#" class="cta">Visit</a>
+    </nav>
+  </header>
+
+  <section class="hero">
+    <p class="eyebrow">Est. 1891 · Single-origin chocolate</p>
+    <h1>Where the river<br /><em>runs</em> chocolate.</h1>
+    <p class="sub">Drag to look around · <strong>press and hold the river</strong> to go under.</p>
+  </section>
+
+  <section class="hero hero-under">
+    <p class="eyebrow">Beneath the river</p>
+    <h1>The world<br />that <em>melts</em> below.</h1>
+    <p class="sub">Every bean, every pod, drifting in the warm dark.</p>
+    <button id="surface-btn" class="surface-btn">↑ Surface</button>
+  </section>
+
+
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>
